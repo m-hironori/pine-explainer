@@ -1,0 +1,56 @@
+# This file configures the project for packaging, and can also hold other
+# tools' configuration settings.
+#
+# More details about what can go in this file:
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+
+[project]
+name = "pine-explainer"
+description = "An explainable entity matching by pair tokens"
+readme = "README.md"
+authors = [
+    {name = "Hironori Mizuguchi", email = "hironori@kde.cs.tsukuba.ac.jp"},
+]
+
+# From https://choosealicense.com/
+license.text = "MIT License"
+
+# Classifiers for your package. PyPI displays these on its page.
+# See https://pypi.org/classifiers/ for all of the possibilities.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+# This is the minimum version of Python that pip will install your package on.
+# An overview of Python versions, their features and their lifecycle time frames
+# is at https://nedbatchelder.com/text/which-py.html.
+requires-python = ">= 3.9"
+
+# List your needed third-party libraries, if you have any.  "rich" is here as an
+# example.  Your list will be completely different.
+dependencies = [
+    "rich",
+]
+
+# State that the version will be defined dynamically below.
+dynamic = ["version"]
+
+[project.urls]
+"Source code" = "https://github.com/m-hironori/pine-explainer"
+"Issue tracker" = "https://github.com/m-hironori/pine-explainer/issues"
+
+[project.scripts]
+
+[tool.setuptools.dynamic]
+version.attr = "pine.__version__"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
