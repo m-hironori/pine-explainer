@@ -33,10 +33,16 @@ classifiers = [
 # is at https://nedbatchelder.com/text/which-py.html.
 requires-python = ">= 3.9"
 
-# List your needed third-party libraries, if you have any.  "rich" is here as an
-# example.  Your list will be completely different.
+# List your needed third-party libraries, if you have any.
 dependencies = [
-    "rich",
+    "lemon-explain[matchers]",
+    "lime",
+    "transformers",
+    "torch",
+    "pandas",
+    "numpy",
+    "nltk",
+    "scikit-learn"
 ]
 
 # State that the version will be defined dynamically below.

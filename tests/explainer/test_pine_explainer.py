@@ -8,7 +8,7 @@ from pine.matcher.magellan_matcher import make_magellan_matcher_func
 
 def test_make_explanation():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/lemon/model"
+    model_root_dir = "data/model"
     predict_proba_func = make_magellan_matcher_func(dataset_name, model_root_dir)
 
     entity_l = Entity(

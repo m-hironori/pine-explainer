@@ -32,7 +32,7 @@ def test_mask_segments():
 
 def test_make_data_with_max_mask_until_num_data():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/lemon/model"
+    model_root_dir = "data/model"
     predict_proba_func = make_magellan_matcher_func(dataset_name, model_root_dir)
 
     entity_l = Entity(
@@ -71,7 +71,7 @@ def test_make_data_with_max_mask_until_num_data():
 
 def test_make_explanation():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/lemon/model"
+    model_root_dir = "data/model"
     predict_proba_func = make_magellan_matcher_func(dataset_name, model_root_dir)
 
     entity_l = Entity(
