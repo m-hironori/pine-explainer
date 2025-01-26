@@ -7,7 +7,7 @@ import concurrent.futures
 import pandas as pd
 import numpy as np
 
-# Can not save and load the model created MalleganMatcher in lemon
+# Can not save and load the model created MalleganMatcher.
 # So, patching with these codes for saving and loading model file
 
 
@@ -65,7 +65,7 @@ from lemon.utils.matchers import MagellanMatcher
 from pine.matcher import _make_proba_fn
 
 
-def _load_magellan_model_predict_func(
+def load_magellan_model_predict_func(
     dataset_name: str, model_root_dir: str = "."
 ) -> typing.Callable:
     with (
@@ -76,45 +76,8 @@ def _load_magellan_model_predict_func(
 
 
 def make_magellan_matcher_func(dataset_name: str, model_root_dir: str):
-    predict_proba_func = _load_magellan_model_predict_func(dataset_name, model_root_dir)
+    predict_proba_func = load_magellan_model_predict_func(dataset_name, model_root_dir)
     proba_fn = _make_proba_fn(predict_proba_func)
     return proba_fn
 
 
-def make_magellan_matcher_func_para(
-    dataset_name: str, model_root_dir: str, para: int = 1
-):
-    # 並列処理数分のpredictorを作成
-    funcs = [
-        _load_magellan_model_predict_func(dataset_name, model_root_dir)
-        for _ in range(para)
-    ]
-
-    def predict_proba_func(
-        records_a: pd.DataFrame, records_b: pd.DataFrame, record_id_pairs: pd.DataFrame
-    ):
-        # para分にデータを分割
-        each_len = math.ceil(len(record_id_pairs) / para)
-        datas = []
-        for i in range(0, len(record_id_pairs), each_len):
-            datas.append(record_id_pairs.iloc[i : i + each_len])
-
-        scores = [None] * len(datas)
-        with concurrent.futures.ProcessPoolExecutor(max_workers=para) as executor:
-            future_to_idx = {
-                executor.submit(funcs[i], records_a, records_b, datas[i]): i
-                for i in range(len(datas))
-            }
-            for future in concurrent.futures.as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                try:
-                    scores[idx] = future.result()
-                except Exception as e:
-                    scores[idx] = pd.Series(
-                        [np.nan] * len(datas[idx]), index=datas[idx].index
-                    )
-        scores = pd.concat(scores)
-        return scores
-
-    proba_fn = _make_proba_fn(predict_proba_func)
-    return proba_fn

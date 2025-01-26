@@ -87,7 +87,7 @@ def make_pair_segments_core(
         )
     )
 
-    is_match = lime_result_org.lime_match_score > 0
+    is_match = lime_result_org.match_score > 0
     token_idxs_org_l = [attr.index for attr in lime_result_org.attributions_l]
     token_idxs_org_r = [attr.index for attr in lime_result_org.attributions_r]
     token_attrs_org_l = {x.index: x.score for x in lime_result_org.attributions_l}
