@@ -42,5 +42,5 @@ Arbitrary entity matching model which is wraped PINE's function call interface
 
 ## How to use
 
-Please see [example/PINE_example.ipynb](example/PINE_example.ipynb)
+Please see [examples/PINE_example.ipynb](examples/PINE_example.ipynb)
 
