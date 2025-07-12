@@ -159,6 +159,8 @@ def make_explanation(
     n_sample: int = None,
     random_state: int = 0,
     fit_intercept: bool = True,
+    num_features: int = None,
+    feature_selection: str = "none",
 ) -> Tuple[
     List[AttributionScore], List[AttributionScore], float, float, float, float
 ]:
@@ -172,6 +174,8 @@ def make_explanation(
     * n_sample(int) : LIME実行時にサンプリングするデータ数,
     * random_state(int)
     * fit_intercept(bool) : limeの線形Fit時に切片を含めるか
+    * num_features(int) : limeで出力する特徴量の数
+    * feature_selection(str) : limeで出力する特徴量の数を決定する手法.'none', 'auto', 'forward_selection', 'highest_weights','lasso_path',
 
     Returns:
     * attribution_scores_l(List) : 左商品の単語idx, スコアのペアのリスト,
@@ -211,8 +215,8 @@ def make_explanation(
         neighbor_scores,
         neighbor_dist,
         0,
-        num_features=None,
-        feature_selection="none",
+        num_features=num_features,
+        feature_selection=feature_selection,
         model_regressor=model_regressor,
     )
 
