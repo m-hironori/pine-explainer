@@ -2,7 +2,9 @@ import nltk
 from nltk.corpus import wordnet as wn
 from transformers import AutoTokenizer, AutoModel
 import torch
+from torch.utils.data import DataLoader
 import numpy as np
+from pine.logger_utils import log_execution_time
 
 nltk.download("wordnet")
 
@@ -14,46 +16,63 @@ bert_tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
 bert_model = AutoModel.from_pretrained(bert_model_name).to(device)
 
 
-def calculate_cosine_similarities_with_mean_pooling(word_pairs):
+@log_execution_time
+def calculate_cosine_similarities_with_mean_pooling(word_pairs, batch_size:int=256):
+    similarities = np.array([])
     # 0件なら0件で返す
     if len(word_pairs) == 0:
         return np.array([])
 
-    word1_list = [pair[0] for pair in word_pairs]
-    word2_list = [pair[1] for pair in word_pairs]
+    class WordPairDataset(torch.utils.data.Dataset):
+        def __init__(self, pairs):
+            self.pairs = pairs
 
-    inputs1 = bert_tokenizer(
-        word1_list, return_tensors="pt", truncation=True, padding=True, max_length=128
-    ).to(bert_model.device)
-    inputs2 = bert_tokenizer(
-        word2_list, return_tensors="pt", truncation=True, padding=True, max_length=128
-    ).to(bert_model.device)
+        def __len__(self):
+            return len(self.pairs)
 
-    with torch.no_grad():
-        outputs1 = bert_model(**inputs1)
-        outputs2 = bert_model(**inputs2)
+        def __getitem__(self, idx):
+            return self.pairs[idx]
 
-    # 平均Poolingを行う
-    mask1 = (
-        inputs1["attention_mask"]
-        .unsqueeze(-1)
-        .expand_as(outputs1.last_hidden_state)
-        .float()
-    )
-    mask2 = (
-        inputs2["attention_mask"]
-        .unsqueeze(-1)
-        .expand_as(outputs2.last_hidden_state)
-        .float()
-    )
+    dataset = WordPairDataset(word_pairs)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
+    for word_pairs_batch in dataloader:
+        word1_list = [pair[0] for pair in word_pairs_batch]
+        word2_list = [pair[1] for pair in word_pairs_batch]
 
-    embed1 = torch.sum(outputs1.last_hidden_state * mask1, 1) / mask1.sum(1)
-    embed2 = torch.sum(outputs2.last_hidden_state * mask2, 1) / mask2.sum(1)
+        inputs1 = bert_tokenizer(
+            word1_list, return_tensors="pt", truncation=True, padding=True, max_length=128
+        ).to(bert_model.device)
+        inputs2 = bert_tokenizer(
+            word2_list, return_tensors="pt", truncation=True, padding=True, max_length=128
+        ).to(bert_model.device)
 
-    # コサイン類似度を計算し、numpy配列として返す
-    similarities = (
-        torch.nn.functional.cosine_similarity(embed1, embed2).to("cpu").numpy()
-    )
+        with torch.no_grad():
+            outputs1 = bert_model(**inputs1)
+            outputs2 = bert_model(**inputs2)
+
+        # 平均Poolingを行う
+        mask1 = (
+            inputs1["attention_mask"]
+            .unsqueeze(-1)
+            .expand_as(outputs1.last_hidden_state)
+            .float()
+        )
+        mask2 = (
+            inputs2["attention_mask"]
+            .unsqueeze(-1)
+            .expand_as(outputs2.last_hidden_state)
+            .float()
+        )
+
+        embed1 = torch.sum(outputs1.last_hidden_state * mask1, 1) / mask1.sum(1)
+        embed2 = torch.sum(outputs2.last_hidden_state * mask2, 1) / mask2.sum(1)
+
+        # コサイン類似度を計算し、numpy配列として返す
+        similarities_batch = (
+            torch.nn.functional.cosine_similarity(embed1, embed2).to("cpu").numpy()
+        )
+        similarities = np.concatenate((similarities, similarities_batch))
+
     return similarities
 
 def get_hypernyms_recursive(synset, depth=2):
@@ -67,6 +86,7 @@ def get_hypernyms_recursive(synset, depth=2):
     return hypernyms
 
 
+#@log_execution_time
 def determine_word_relationship(word1: str, word2: str, hypernym_depth: int = 2) -> str:
     # 同義語、対義語、同カテゴリのフラグを初期化
     is_synonym = False
