@@ -11,6 +11,7 @@ from pine.explainer.token_pair_metrics import (
     calculate_cosine_similarities_with_mean_pooling,
     determine_word_relationship,
 )
+from pine.logger_utils import log_execution_time
 
 
 @dataclass
@@ -63,6 +64,7 @@ def select_sim_score_relationship(
     return None, -1, is_exists_same_word
 
 
+@log_execution_time
 def make_pair_segments_core(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -204,6 +206,7 @@ def make_pair_segments_core(
     return pair_segment_list
 
 
+@log_execution_time
 def make_pair_segments(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -236,6 +239,7 @@ def make_pair_segments(
     return pair_segment_list_filtered
 
 
+@log_execution_time
 def make_explanation(
     entity_pair: EntityPair,
     proba_fn: Callable,

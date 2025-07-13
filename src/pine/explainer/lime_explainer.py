@@ -6,6 +6,7 @@ from sklearn.linear_model import LinearRegression
 from lime import lime_base
 from pine.entity import EntityPair
 from pine.explainer import AttributionScore
+from pine.logger_utils import log_execution_time
 
 
 def mask_segments(
@@ -152,6 +153,7 @@ def kernel(d: np.ndarray) -> float:
     return np.exp(-2 * d)
 
 
+@log_execution_time
 def make_explanation(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -240,6 +242,7 @@ def make_explanation(
     )
 
 
+@log_execution_time
 def make_explanation_without_separate_lr(
     entity_pair: EntityPair,
     proba_fn: Callable,
