@@ -4,7 +4,6 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
-from pine.logger_utils import log_execution_time
 
 nltk.download("wordnet")
 
@@ -16,8 +15,7 @@ bert_tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
 bert_model = AutoModel.from_pretrained(bert_model_name).to(device)
 
 
-@log_execution_time
-def calculate_cosine_similarities_with_mean_pooling(word_pairs, batch_size:int=256):
+def calculate_cosine_similarities_with_mean_pooling(word_pairs, batch_size:int=512):
     similarities = np.array([])
     # 0件なら0件で返す
     if len(word_pairs) == 0:

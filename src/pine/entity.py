@@ -269,13 +269,17 @@ class Entity:
 
     def to_dataframe(self) -> pd.DataFrame:
         """EntityをDataFrame表現に変換する"""
+        # df = pd.DataFrame(
+        #     data={attr.name: [attr.value] for attr in self.attr_list},
+        #     columns=[attr.name for attr in self.attr_list],
+        # )
+        # df.index.name = "__id"
+        # for col, attr in zip(df.columns, self.attr_list):
+        #     df[col] = df[col].astype(attr.dtype)
         df = pd.DataFrame(
-            data={attr.name: [attr.value] for attr in self.attr_list},
-            columns=[attr.name for attr in self.attr_list],
+            {attr.name: pd.Series([attr.value], dtype=attr.dtype) for attr in self.attr_list},
         )
         df.index.name = "__id"
-        for col, attr in zip(df.columns, self.attr_list):
-            df[col] = df[col].astype(attr.dtype)
         return df
 
     def from_dataframe(df: pd.DataFrame) -> Entity:

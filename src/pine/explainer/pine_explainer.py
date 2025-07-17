@@ -11,7 +11,6 @@ from pine.explainer.token_pair_metrics import (
     calculate_cosine_similarities_with_mean_pooling,
     determine_word_relationship,
 )
-from pine.logger_utils import log_execution_time
 
 
 @dataclass
@@ -64,7 +63,6 @@ def select_sim_score_relationship(
     return None, -1, is_exists_same_word
 
 
-@log_execution_time
 def make_pair_segments_core(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -73,6 +71,7 @@ def make_pair_segments_core(
     n_sample: int,
     random_state: int,
     fit_intercept: bool,
+    batch_size: int = 512,
 ) -> List[PairSegment]:
     """対応したセグメントのリストを作成。score順に返す。"""
     pair_segment_list: List[PairSegment] = []
@@ -109,7 +108,7 @@ def make_pair_segments_core(
             )
     idx_pairs = list(word_pair_dic.keys())
     sims_all = calculate_cosine_similarities_with_mean_pooling(
-        list(word_pair_dic.values())
+        list(word_pair_dic.values()), batch_size=batch_size
     )
     word_pair_sims = {idx: sim for idx, sim in zip(idx_pairs, sims_all)}
 
@@ -206,7 +205,6 @@ def make_pair_segments_core(
     return pair_segment_list
 
 
-@log_execution_time
 def make_pair_segments(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -215,10 +213,11 @@ def make_pair_segments(
     n_sample: int,
     random_state: int,
     fit_intercept: bool,
+    batch_size: int = 512,
 ) -> List:
     """Create a list of segments."""
     pair_segment_list: List[PairSegment] = make_pair_segments_core(
-        entity_pair, proba_fn, topk, kernel, n_sample, random_state, fit_intercept
+        entity_pair, proba_fn, topk, kernel, n_sample, random_state, fit_intercept, batch_size=batch_size
     )
     # score の絶対値の大きいものからtop_n選択
     #  ただし、既に選択したtokenを含んでいる場合はSKIP
@@ -239,7 +238,6 @@ def make_pair_segments(
     return pair_segment_list_filtered
 
 
-@log_execution_time
 def make_explanation(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -249,11 +247,12 @@ def make_explanation(
     n_sample: int = None,
     random_state: int = 0,
     fit_intercept: bool = True,
+    batch_size: int = 512,
 ) -> Tuple[LimeResultPair, EntityPair]:
     """Explain the prediction of the model using PINE."""
     # STEP1: Create a list of segments
     pair_segments = make_pair_segments(
-        entity_pair, proba_fn, topk, kernel, n_sample, random_state, fit_intercept
+        entity_pair, proba_fn, topk, kernel, n_sample, random_state, fit_intercept=fit_intercept, batch_size=batch_size
     )
     merge_segments :List[MergedSegment] = []
     for pair_seg in pair_segments:

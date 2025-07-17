@@ -44,8 +44,10 @@ def load_transformer_pred_func(model_name):
             truncation=True,
             max_length=model.config.max_position_embeddings,
             return_tensors="pt",
-        ).to(device)
-        return model(**encoded)
+        ).to(model.device)
+        with torch.no_grad():
+            outputs = model(**encoded)
+        return outputs
 
     return predict_func
 

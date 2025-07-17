@@ -6,7 +6,6 @@ from sklearn.linear_model import LinearRegression
 from lime import lime_base
 from pine.entity import EntityPair
 from pine.explainer import AttributionScore
-from pine.logger_utils import log_execution_time
 
 
 def mask_segments(
@@ -153,7 +152,6 @@ def kernel(d: np.ndarray) -> float:
     return np.exp(-2 * d)
 
 
-@log_execution_time
 def make_explanation(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -163,6 +161,7 @@ def make_explanation(
     fit_intercept: bool = True,
     num_features: int = None,
     feature_selection: str = "none",
+    batch_size: int = 512,
 ) -> Tuple[
     List[AttributionScore], List[AttributionScore], float, float, float, float
 ]:
@@ -199,6 +198,7 @@ def make_explanation(
         mask_token_str=None,
         add_all_mask_data=False,
         random_state=random_state,
+        batch_size=batch_size,
     )
 
     # 一つ目のデータはマスクなしデータなので、ここから実際のスコアを抽出
@@ -242,7 +242,6 @@ def make_explanation(
     )
 
 
-@log_execution_time
 def make_explanation_without_separate_lr(
     entity_pair: EntityPair,
     proba_fn: Callable,
@@ -250,6 +249,7 @@ def make_explanation_without_separate_lr(
     n_sample: int = None,
     random_state: int = 0,
     fit_intercept: bool = True,
+    batch_size: int = 512,
 ) -> Tuple[
     List[AttributionScore], float, float, float, float
 ]:
@@ -282,6 +282,7 @@ def make_explanation_without_separate_lr(
         mask_token_str=None,
         add_all_mask_data=False,
         random_state=random_state,
+        batch_size=batch_size,
     )
 
     # 一つ目のデータはマスクなしデータなので、ここから実際のスコアを抽出
