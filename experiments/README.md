@@ -1,50 +1,50 @@
-# 実験用コードフォルダ
+# Experimental Code Folder
 
-## 実行手順
+## Execution Procedure
 
-### Matcherモデルを作成
+### Create Matcher Models
 
-- DITTOモデルの作成
-  - `01_make_model/make_DITTO_model_by_lemon.ipynb` を実行
-- py_entitymacching モデルの作成
-  - `01_make_model/make_py_entitymatching_model_by_lemon.ipynb` を実行
-- モデルの精度比較
-  - `01_make_modelcompare_model_evaluation.ipynb` を実行
+- Create DITTO Model
+  - Run `01_make_model/make_DITTO_model_by_lemon.ipynb`
+- Create py_entitymatching Model
+  - Run `01_make_model/make_py_entitymatching_model_by_lemon.ipynb`
+- Compare Model Accuracy
+  - Run `01_make_model/compare_model_evaluation.ipynb`
 
-### LIME, Lemon の explanation を作成
+### Create LIME and Lemon Explanations
 
-- LIME のexplanation作成
-  - `cd 02_make_explanation; bash make_lime_results_ditto.sh` を実行
-  - `cd 02_make_explanation; bash make_lime_results_magellan.sh` を実行
-- LEMON のexplanationの作成
-  - `cd 02_make_explanation; bash make_lemon_results_ditto.sh` を実行
-  - `cd 02_make_explanation; bash make_lemon_results_magellan.sh` を実行
+- Create LIME Explanations
+  - Run `cd 02_make_explanation; bash make_lime_results_ditto.sh`
+  - Run `cd 02_make_explanation; bash make_lime_results_magellan.sh`
+- Create LEMON Explanations
+  - Run `cd 02_make_explanation; bash make_lemon_results_ditto.sh`
+  - Run `cd 02_make_explanation; bash make_lemon_results_magellan.sh`
 
-### PINE, CosSim, LIME_pair, LIME_r, Lemon_r の explanation を作成
+### Create PINE, CosSim, LIME_pair, LIME_r, and Lemon_r Explanations
 
-- PINE の explanation作成
-  - `cd 02_make_explanation; bash eval_pine.sh` を実行
-- CosSim の explanation作成
-  - `cd 02_make_explanation; bash eval_cossim.sh` を実行
-- LIME_pair の explanation作成
-  - `cd 02_make_explanation; bash eval_lime_pair.sh` を実行
-- LIME_r の explanation作成
-  - `cd 02_make_explanation; bash eval_lime_ranked.sh` を実行
-- LEMON_r の explanation作成
-  - `cd 02_make_explanation; bash eval_lemon_ranked.sh` を実行
+- Create PINE Explanations
+  - Run `cd 02_make_explanation; bash eval_pine.sh`
+- Create CosSim Explanations
+  - Run `cd 02_make_explanation; bash eval_cossim.sh`
+- Create LIME_pair Explanations
+  - Run `cd 02_make_explanation; bash eval_lime_pair.sh`
+- Create LIME_r Explanations
+  - Run `cd 02_make_explanation; bash eval_lime_ranked.sh`
+- Create LEMON_r Explanations
+  - Run `cd 02_make_explanation; bash eval_lemon_ranked.sh`
 
-### Metrics で比較評価
+### Comparative Evaluation with Metrics
 
-`03_evaluations/compare_methods_revised.ipynb` を実行
+Run `03_evaluations/compare_methods_revised.ipynb`
 
-### WYM を比較評価
+### Comparative Evaluation of WYM
 
-- WYM モデル作成
-  - `cd 04_evaluations_wym; bash make_wym_model.sh` を実行
-- WYM の explanation の作成
-  - `cd 04_evaluations_wym; bash eval_wym.sh` を実行
-- PINE の explanation の作成
-  - `cd 04_evaluations_wym; bash make_lime_results_wym_matcher.sh`
-  - `cd 04_evaluations_wym; bash make_wym_pine.sh`
-- Metricsで比較評価
-  - `04_evaluations/compare_methods_wym_revised.ipynb` を実行
+- Create WYM Model
+  - Run `cd 04_evaluations_wym; bash make_wym_model.sh`
+- Create WYM Explanations
+  - Run `cd 04_evaluations_wym; bash eval_wym.sh`
+- Create PINE Explanations
+  - Run `cd 04_evaluations_wym; bash make_lime_results_wym_matcher.sh`
+  - Run `cd 04_evaluations_wym; bash make_wym_pine.sh`
+- Comparative Evaluation with Metrics
+  - Run `04_evaluations/compare_methods_wym_revised.ipynb`
