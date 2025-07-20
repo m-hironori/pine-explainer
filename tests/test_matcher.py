@@ -20,7 +20,7 @@ from pine.matcher.transformer_matcher import (
 
 def test_load_bert_mini_model_predict_func():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/model"
+    model_root_dir = "examples/data/model"
     df_l = pd.DataFrame(
         columns=["title", "manufacturer", "price"],
         data=[["iphone 13 apple", "apple", 10], [None, None, None]],
@@ -49,7 +49,7 @@ def test_load_bert_mini_model_predict_func():
 
 def test_load_magellan_model_predict_func():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/model"
+    model_root_dir = "examples/data/model"
     df_l = pd.DataFrame(
         columns=["title", "manufacturer", "price"],
         data=[["iphone 13 apple", "apple", 10], [None, None, None]],
@@ -83,7 +83,7 @@ def test_load_magellan_model_predict_func():
 
 def test_make_proba_fn():
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/model"
+    model_root_dir = "examples/data/model"
     predict_proba_func = load_magellan_model_predict_func(dataset_name, model_root_dir)
     proba_fn = _make_proba_fn(predict_proba_func)
 
@@ -126,7 +126,7 @@ def test_make_magellan_matcher_func():
     )
     entity_pair = EntityPair(entity_l, entity_r)
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/model"
+    model_root_dir = "examples/data/model"
     matcher_fn = make_magellan_matcher_func(dataset_name, model_root_dir)
 
     scores = matcher_fn([entity_pair, entity_pair])
@@ -160,7 +160,7 @@ def test_make_transformer_matcher_func():
     entity_pair_1 = EntityPair(entity_l, entity_r_1)
     entity_pair_2 = EntityPair(entity_l, entity_r_2)
     dataset_name = "structured_amazon_google"
-    model_root_dir = "data/model"
+    model_root_dir = "examples/data/model"
     matcher_fn = make_transformer_matcher_func(dataset_name, model_root_dir)
 
     scores = matcher_fn([entity_pair_1, entity_pair_2])

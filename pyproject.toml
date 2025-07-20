@@ -9,7 +9,7 @@ name = "pine-explainer"
 description = "An explainable entity matching by pair tokens"
 readme = "README.md"
 authors = [
-    {name = "Hironori Mizuguchi", email = "hironori@kde.cs.tsukuba.ac.jp"},
+    {name = "Foo Bar", email = "foo_Bar@foo.bar"},
 ]
 
 # From https://choosealicense.com/
@@ -49,8 +49,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-"Source code" = "https://github.com/m-hironori/pine-explainer"
-"Issue tracker" = "https://github.com/m-hironori/pine-explainer/issues"
+"Source code" = "https://github.com/foo-bar/pine-explainer"
+"Issue tracker" = "https://github.com/foo-bar/pine-explainer/issues"
 
 [project.scripts]
 

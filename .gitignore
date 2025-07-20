@@ -1,6 +1,7 @@
 .python-version
 .vscode/
-#data/
+data/
+!examples/data
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

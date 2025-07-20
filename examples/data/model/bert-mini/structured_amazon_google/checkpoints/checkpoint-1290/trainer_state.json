@@ -1,6 +1,6 @@
 {
   "best_metric": 0.7106796116504855,
-  "best_model_checkpoint": "../../data/lemon/model/bert-mini/structured_amazon_google/checkpoints/checkpoint-1290",
+  "best_model_checkpoint": "../data/model/bert-mini/structured_amazon_google/checkpoints/checkpoint-1290",
   "epoch": 6.0,
   "global_step": 1290,
   "is_hyper_param_search": false,
