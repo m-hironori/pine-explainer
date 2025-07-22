@@ -44,3 +44,6 @@ Arbitrary entity matching model which is wraped PINE's function call interface
 
 Please see [examples/PINE_example.ipynb](examples/PINE_example.ipynb)
 
+## Our experiments
+
+Please see [experiments/README.md](experiments/README.md)
