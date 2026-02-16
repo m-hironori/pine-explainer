@@ -1,7 +1,6 @@
 import pytest
 import pandas as pd
 from pine.entity import (
-    regex_tokenizer,
     make_word_poslist,
     TokenPos,
     Attribute,
@@ -10,22 +9,7 @@ from pine.entity import (
     SegmentPart,
     MergedSegment,
 )
-
-
-def test_regex_tokenizer():
-    # tokenizer のテスト
-    text = "COL  Name VAL iphone  12 "
-    expected_tokens = ["COL", "Name", "VAL", "iphone", "12"]
-    expected_token_poss = [
-        TokenPos(start=0, end=3),
-        TokenPos(start=5, end=9),
-        TokenPos(start=10, end=13),
-        TokenPos(start=14, end=20),
-        TokenPos(start=22, end=24),
-    ]
-    tokens, token_poss = regex_tokenizer(text)
-    assert tokens == expected_tokens
-    assert token_poss == expected_token_poss
+from pine.text_tokenizer import regex_tokenizer
 
 
 @pytest.mark.parametrize(

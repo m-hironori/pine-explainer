@@ -7,34 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-
-@dataclass
-class TokenPos:
-    """文字位置データ"""
-
-    start: int
-    end: int
-
-
-def regex_tokenizer(text: str, sep_regex: str = "\s+") -> Tuple[int, int]:
-    """文字列を入力に、regex区切り(デフォルトは空白)の開始、終了文字位置IDXを返す"""
-    # 各tokenの表層文字列
-    tokens = []
-    # 各tokenの文字IDXペア(開始,終了)リスト
-    token_poss = []
-    pattern = re.compile(sep_regex)
-    pos = 0
-    while pos < len(text):
-        m = pattern.search(text, pos)
-        if m is None:
-            break
-        token_poss.append(TokenPos(pos, m.start()))
-        tokens.append(text[pos : m.start()])
-        pos = m.end()
-    if pos < len(text):
-        token_poss.append(TokenPos(pos, len(text)))
-        tokens.append(text[pos : len(text)])
-    return tokens, token_poss
+from .text_tokenizer import TokenPos, phrase_tokenizer, regex_tokenizer
 
 
 def make_word_poslist(
@@ -105,18 +78,20 @@ class SegmentPart:
 class Entity:
     """Entityを表すクラス"""
 
-    def __init__(self, attr_list: List[Attribute] = []):
+    def __init__(self, attr_list: List[Attribute] = [], token_is_word: bool = True) -> None:
         self.attr_list: List[Attribute] = attr_list
-        self.segment_list: List[List[SegmentPart]] = self._make_segments(attr_list)
+        self.token_is_phrase = token_is_word
+        self.segment_list: List[List[SegmentPart]] = self._make_segments(attr_list, token_is_word)
 
-    def _make_segments(self, attr_list: List[Attribute]) -> List[List[SegmentPart]]:
+    def _make_segments(self, attr_list: List[Attribute], token_is_word) -> List[List[SegmentPart]]:
         """セグメントを作成する"""
         segment_list: List[List[SegmentPart]] = []
         word_to_seg: Dict[str, List[SegmentPart]] = {}
         for attr_index, attr in enumerate(attr_list):
             if attr.dtype == "string":
                 # 文字列の場合は、単語区切り
-                words, poslist = make_word_poslist(attr.value, regex_tokenizer, True)
+                tokenizer_func = regex_tokenizer if token_is_word else phrase_tokenizer
+                words, poslist = make_word_poslist(attr.value, tokenizer_func, True)
                 for word, poss in zip(words, poslist):
                     segment = [
                         SegmentPart(attr_index, pos.start, pos.end) for pos in poss
@@ -227,7 +202,7 @@ class Entity:
             # 前後の空白は削除
             val = val.strip(" ")
             attr_list[target_attr_idx].value = val
-        return Entity(attr_list)
+        return Entity(attr_list, self.token_is_phrase)
 
     def make_entity_by_adding_attribute(self, attr_list: List[Attribute]) -> Entity:
         """"""
@@ -249,7 +224,7 @@ class Entity:
                     "Can not add the attribute "
                     f"name={attr.name} val={attr.value} dtype={attr.dtype}"
                 )
-        return Entity(org_attr_list)
+        return Entity(org_attr_list, self.token_is_phrase)
 
     def is_equal_val(self, entity_other: Entity) -> bool:
         """値が同じか"""
@@ -277,12 +252,15 @@ class Entity:
         # for col, attr in zip(df.columns, self.attr_list):
         #     df[col] = df[col].astype(attr.dtype)
         df = pd.DataFrame(
-            {attr.name: pd.Series([attr.value], dtype=attr.dtype) for attr in self.attr_list},
+            {
+                attr.name: pd.Series([attr.value], dtype=attr.dtype)
+                for attr in self.attr_list
+            },
         )
         df.index.name = "__id"
         return df
 
-    def from_dataframe(df: pd.DataFrame) -> Entity:
+    def from_dataframe(df: pd.DataFrame, token_is_word:bool=True) -> Entity:
         """DataFrameから作成"""
         if len(df) != 1:
             ValueError("DataFrame must have only 1 record.")
@@ -295,7 +273,7 @@ class Entity:
                     val = ""
             attr = Attribute(col, val, dtype)
             attr_list.append(attr)
-        return Entity(attr_list)
+        return Entity(attr_list, token_is_word)
 
 
 @dataclass
@@ -480,7 +458,6 @@ class EntityPair:
         )
         return entity_pair_new
 
-
     def make_entity_pair_by_merging_segment_list_only(
         self, merging_segment_list: List[MergedSegment]
     ) -> EntityPair:
@@ -496,7 +473,6 @@ class EntityPair:
             entity_pair_new._sort_merged_segment_list()
         )
         return entity_pair_new
-
 
     def _sort_merged_segment_list(self) -> List[MergedSegment]:
         """並べ替える（左のみ、右のみ、両方）"""
