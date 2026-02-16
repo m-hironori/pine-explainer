@@ -459,7 +459,7 @@ class EntityPair:
         return entity_pair_new
 
     def make_entity_pair_by_merging_segment_list_only(
-        self, merging_segment_list: List[MergedSegment]
+        self, merging_segment_list: List[MergedSegment], is_sorted: bool = True
     ) -> EntityPair:
         """merged segment のみをセグメントとするentity_pairを作成"""
         entity_l_new = copy.deepcopy(self.entity_l)
@@ -469,9 +469,10 @@ class EntityPair:
         # 既存のセグメントをすべて破棄し、merging_segment_listのみを採用する
         entity_pair_new.merged_segment_list = merged_segment_new
         # 並べ替える
-        entity_pair_new.merged_segment_list = (
-            entity_pair_new._sort_merged_segment_list()
-        )
+        if is_sorted:
+            entity_pair_new.merged_segment_list = (
+                entity_pair_new._sort_merged_segment_list()
+            )
         return entity_pair_new
 
     def _sort_merged_segment_list(self) -> List[MergedSegment]:
