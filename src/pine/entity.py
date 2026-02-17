@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from .text_tokenizer import TokenPos, phrase_tokenizer, regex_tokenizer
+from .text_tokenizer import TokenPos, regex_tokenizer
 
 
 def make_word_poslist(
@@ -78,20 +78,34 @@ class SegmentPart:
 class Entity:
     """Entityを表すクラス"""
 
-    def __init__(self, attr_list: List[Attribute] = [], token_is_word: bool = True) -> None:
+    def __init__(
+        self,
+        attr_list: List[Attribute] = [],
+        tokenizer_func: Callable = regex_tokenizer,
+        aggregate_same_word: bool = True,
+    ) -> None:
         self.attr_list: List[Attribute] = attr_list
-        self.token_is_phrase = token_is_word
-        self.segment_list: List[List[SegmentPart]] = self._make_segments(attr_list, token_is_word)
+        self.tokenizer_func = tokenizer_func
+        self.aggregate_same_word = aggregate_same_word
+        self.segment_list: List[List[SegmentPart]] = self._make_segments(
+            attr_list, tokenizer_func, aggregate_same_word
+        )
 
-    def _make_segments(self, attr_list: List[Attribute], token_is_word) -> List[List[SegmentPart]]:
+    def _make_segments(
+        self,
+        attr_list: List[Attribute],
+        tokenizer_func: Callable,
+        aggregate_same_word: bool,
+    ) -> List[List[SegmentPart]]:
         """セグメントを作成する"""
         segment_list: List[List[SegmentPart]] = []
         word_to_seg: Dict[str, List[SegmentPart]] = {}
         for attr_index, attr in enumerate(attr_list):
             if attr.dtype == "string":
                 # 文字列の場合は、単語区切り
-                tokenizer_func = regex_tokenizer if token_is_word else phrase_tokenizer
-                words, poslist = make_word_poslist(attr.value, tokenizer_func, True)
+                words, poslist = make_word_poslist(
+                    attr.value, tokenizer_func, aggregate_same_word
+                )
                 for word, poss in zip(words, poslist):
                     segment = [
                         SegmentPart(attr_index, pos.start, pos.end) for pos in poss
@@ -202,7 +216,7 @@ class Entity:
             # 前後の空白は削除
             val = val.strip(" ")
             attr_list[target_attr_idx].value = val
-        return Entity(attr_list, self.token_is_phrase)
+        return Entity(attr_list, self.tokenizer_func, self.aggregate_same_word)
 
     def make_entity_by_adding_attribute(self, attr_list: List[Attribute]) -> Entity:
         """"""
@@ -224,7 +238,7 @@ class Entity:
                     "Can not add the attribute "
                     f"name={attr.name} val={attr.value} dtype={attr.dtype}"
                 )
-        return Entity(org_attr_list, self.token_is_phrase)
+        return Entity(org_attr_list, self.tokenizer_func, self.aggregate_same_word)
 
     def is_equal_val(self, entity_other: Entity) -> bool:
         """値が同じか"""
@@ -260,7 +274,11 @@ class Entity:
         df.index.name = "__id"
         return df
 
-    def from_dataframe(df: pd.DataFrame, token_is_word:bool=True) -> Entity:
+    def from_dataframe(
+        df: pd.DataFrame,
+        tokenizer_func: Callable = regex_tokenizer,
+        aggregate_same_word: bool = True,
+    ) -> Entity:
         """DataFrameから作成"""
         if len(df) != 1:
             ValueError("DataFrame must have only 1 record.")
@@ -273,7 +291,7 @@ class Entity:
                     val = ""
             attr = Attribute(col, val, dtype)
             attr_list.append(attr)
-        return Entity(attr_list, token_is_word)
+        return Entity(attr_list, tokenizer_func, aggregate_same_word)
 
 
 @dataclass

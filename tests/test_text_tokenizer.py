@@ -4,16 +4,32 @@ from pine.text_tokenizer import regex_tokenizer, TokenPos, phrase_tokenizer
 
 def test_regex_tokenizer():
     # tokenizer のテスト
-    text = "COL  Name VAL iphone  12 "
-    expected_tokens = ["COL", "Name", "VAL", "iphone", "12"]
+    text = "COL  Name VAL iphone  12.1 "
+    expected_tokens = ["COL", "Name", "VAL", "iphone", "12.1"]
+    expected_token_poss = [
+        TokenPos(start=0, end=3),
+        TokenPos(start=5, end=9),
+        TokenPos(start=10, end=13),
+        TokenPos(start=14, end=20),
+        TokenPos(start=22, end=26),
+    ]
+    tokens, token_poss = regex_tokenizer(text)
+    assert tokens == expected_tokens
+    assert token_poss == expected_token_poss
+
+def test_regex_tokenizer_regex():
+    # tokenizer のテスト
+    text = "COL  Name VAL iphone  12.1 "
+    expected_tokens = ["COL", "Name", "VAL", "iphone", "12", "1"]
     expected_token_poss = [
         TokenPos(start=0, end=3),
         TokenPos(start=5, end=9),
         TokenPos(start=10, end=13),
         TokenPos(start=14, end=20),
         TokenPos(start=22, end=24),
+        TokenPos(start=25, end=26),
     ]
-    tokens, token_poss = regex_tokenizer(text)
+    tokens, token_poss = regex_tokenizer(text, sep_regex=r'[^a-zA-Z0-9]+')
     assert tokens == expected_tokens
     assert token_poss == expected_token_poss
 
