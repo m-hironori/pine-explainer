@@ -110,11 +110,11 @@ class Entity:
                     segment = [
                         SegmentPart(attr_index, pos.start, pos.end) for pos in poss
                     ]
-                    if word in word_to_seg:
+                    if aggregate_same_word and word in word_to_seg:
                         # すでに単語がある場合、セグメントにセグメントパーツを追加
                         word_to_seg[word].extend(segment)
                     else:
-                        # 初めて出てくる単語の場合、セグメントを新規追加
+                        # セグメントを新規追加
                         word_to_seg[word] = segment
                         segment_list.append(segment)
             else:
