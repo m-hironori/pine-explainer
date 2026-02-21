@@ -76,20 +76,25 @@ class SegmentPart:
 
 
 class Entity:
-    """Entityを表すクラス"""
+    """Class representing an Entity with attributes and segments."""
 
     def __init__(
         self,
         attr_list: List[Attribute] = [],
         tokenizer_func: Callable = regex_tokenizer,
         aggregate_same_word: bool = True,
+        segment_list: Optional[List[List[SegmentPart]]] = None,
     ) -> None:
         self.attr_list: List[Attribute] = attr_list
         self.tokenizer_func = tokenizer_func
         self.aggregate_same_word = aggregate_same_word
-        self.segment_list: List[List[SegmentPart]] = self._make_segments(
-            attr_list, tokenizer_func, aggregate_same_word
-        )
+        
+        if segment_list is not None:
+            self.segment_list = segment_list
+        else:
+            self.segment_list = self._make_segments(
+                attr_list, tokenizer_func, aggregate_same_word
+            )
 
     def _make_segments(
         self,
@@ -97,12 +102,11 @@ class Entity:
         tokenizer_func: Callable,
         aggregate_same_word: bool,
     ) -> List[List[SegmentPart]]:
-        """セグメントを作成する"""
+        """Creates segments from attributes."""
         segment_list: List[List[SegmentPart]] = []
         word_to_seg: Dict[str, List[SegmentPart]] = {}
         for attr_index, attr in enumerate(attr_list):
             if attr.dtype == "string":
-                # 文字列の場合は、単語区切り
                 words, poslist = make_word_poslist(
                     attr.value, tokenizer_func, aggregate_same_word
                 )
@@ -111,113 +115,218 @@ class Entity:
                         SegmentPart(attr_index, pos.start, pos.end) for pos in poss
                     ]
                     if aggregate_same_word and word in word_to_seg:
-                        # すでに単語がある場合、セグメントにセグメントパーツを追加
                         word_to_seg[word].extend(segment)
                     else:
-                        # セグメントを新規追加
                         word_to_seg[word] = segment
                         segment_list.append(segment)
             else:
-                # 文字列の以外の場合は、値全体
                 if attr.value is None:
-                    # 値がない場合はセグメントを作成しない
                     continue
                 segment = [SegmentPart(attr_index, None, None)]
                 segment_list.append(segment)
         return segment_list
 
     def segment_size(self) -> int:
-        """セグメントのサイズを返す"""
         return len(self.segment_list)
 
     def get_segment_label(self, index: int) -> str:
-        """index番号のセグメントの値(ラベル)を返す"""
         segment_parts = self.segment_list[index]
-        # 一つのセグメントのラベルは共通なので、一番はじめのセグメントパーツのラベルを返す
         attr = self.attr_list[segment_parts[0].attr_index]
-        # 文字列の場合、その位置の単語を返す
         if attr.dtype == "string":
             return attr.value[segment_parts[0].start : segment_parts[0].end]
-        # 文字列ではない場合、NoneならNoneを、それ以外はstrにして返す
         if attr.value is None:
             return None
         return str(attr.value)
 
     def get_attribute_list_by_segments(self, index_list: List[int]) -> List[Attribute]:
-        """index番号リストのセグメントのAttributeを返す。
-        Attributeのtypeがstringの場合、valueは元データの出現順を保つ。"""
-        # 対象部分を attr_index 毎にまとめる
         value_seg_parts: Dict[int, List[SegmentPart]] = {}
         for seg_idx in index_list:
             for seg_part in self.segment_list[seg_idx]:
                 if seg_part.attr_index not in value_seg_parts:
                     value_seg_parts[seg_part.attr_index] = []
                 value_seg_parts[seg_part.attr_index].append(seg_part)
+        
         ret_attr_list = []
+        sorted_attr_indices = sorted(value_seg_parts.keys())
 
-        for target_attr_idx, target_segparts in value_seg_parts.items():
+        for target_attr_idx in sorted_attr_indices:
+            target_segparts = value_seg_parts[target_attr_idx]
             attr_org = self.attr_list[target_attr_idx]
-            # 文字列ではない場合、値を抽出
+            
             if attr_org.dtype != "string":
                 attr = Attribute(attr_org.name, attr_org.value, attr_org.dtype)
                 ret_attr_list.append(attr)
                 continue
+            
             val = ""
             target_segparts = sorted(target_segparts, key=lambda x: x.start)
             for target_segpart in target_segparts:
                 val += " " + attr_org.value[target_segpart.start : target_segpart.end]
-            # 連続空白は一つの空白に変更
-            val = re.sub("\s+", " ", val)
-            # 前後の空白は削除
-            val = val.strip(" ")
+            
+            val = re.sub(r"\s+", " ", val).strip()
             attr = Attribute(attr_org.name, val, attr_org.dtype)
             ret_attr_list.append(attr)
         return ret_attr_list
 
+
     def make_entity_by_deleting_segments(
-        self, index_list: List[int], mask_token_str: str = None
-    ) -> Entity:
-        """インデックス番号のセグメントを消したEntityを返す"""
-        if mask_token_str is None:
-            mask_token_str = ""
+        self, 
+        delete_segments_id_list: List[int], 
+        mask_str: str = None, 
+        exclude_non_segment_chars: bool = False
+    ) -> "Entity":
+        """
+        指定されたセグメントを削除（またはマスク）します。
+        
+        Arguments:
+            delete_segments_id_list: 削除/マスク対象のセグメントIDリスト
+            mask_str: 削除部分を置き換える文字列
+            exclude_non_segment_chars: Trueの場合、どのセグメントにも属さない文字（記号等）を空白に置き換える
+        """
+        new_attr_list = []
+        attr_index_maps: Dict[int, List[int]] = {}
 
-        # 同じインデックスを削除
-        index_list = sorted(set(index_list))
+        for i, attr in enumerate(self.attr_list):
+            if attr.dtype == "string":
+                original_val = attr.value
+                val_len = len(original_val)
+                
+                is_in_deleted_segment = [False] * val_len
+                is_in_any_segment = [False] * val_len
+                
+                for s_idx, seg in enumerate(self.segment_list):
+                    for p in seg:
+                        if p.attr_index == i:
+                            for char_idx in range(p.start, p.end):
+                                is_in_any_segment[char_idx] = True
+                                if s_idx in delete_segments_id_list:
+                                    is_in_deleted_segment[char_idx] = True
+                
+                temp_chars = []
+                old_to_temp_idx = [0] * (val_len + 1)
+                current_temp_pos = 0
+                prev_was_space = False
+                in_deleted_span = False
+                
+                for char_idx in range(val_len):
+                    old_to_temp_idx[char_idx] = current_temp_pos
+                    
+                    is_deleted = is_in_deleted_segment[char_idx]
+                    is_noise = not is_in_any_segment[char_idx]
+                    
+                    if is_deleted:
+                        if mask_str is not None and not in_deleted_span:
+                            for m_char in mask_str:
+                                temp_chars.append(m_char)
+                                current_temp_pos += 1
+                            prev_was_space = mask_str[-1].isspace() if mask_str else prev_was_space
+                            in_deleted_span = True
+                        # mask_strがNoneの場合は削除される
+                    elif exclude_non_segment_chars and is_noise:
+                        # セグメント外文字を削除ではなく空白に置き換え
+                        in_deleted_span = False
+                        if not prev_was_space:
+                            temp_chars.append(" ")
+                            current_temp_pos += 1
+                            prev_was_space = True
+                    else:
+                        # 保持対象（既存セグメント内、または exclude_non_segment_chars=False 時のノイズ）
+                        in_deleted_span = False
+                        char = original_val[char_idx]
+                        is_space = char.isspace()
+                        
+                        if is_space:
+                            if not prev_was_space:
+                                temp_chars.append(char)
+                                current_temp_pos += 1
+                                prev_was_space = True
+                        else:
+                            temp_chars.append(char)
+                            current_temp_pos += 1
+                            prev_was_space = False
+                
+                old_to_temp_idx[val_len] = current_temp_pos
+                
+                temp_str = "".join(temp_chars)
+                trimmed_str = temp_str.strip()
+                
+                if not trimmed_str:
+                    attr_index_maps[i] = [0] * (val_len + 1)
+                    new_attr_list.append(Attribute(attr.name, "", attr.dtype))
+                    continue
+                
+                start_offset = len(temp_str) - len(temp_str.lstrip())
+                end_limit = start_offset + len(trimmed_str)
+                
+                final_mapping = [0] * (val_len + 1)
+                for old_idx in range(val_len + 1):
+                    t_pos = old_to_temp_idx[old_idx]
+                    if t_pos <= start_offset:
+                        final_mapping[old_idx] = 0
+                    elif t_pos >= end_limit:
+                        final_mapping[old_idx] = len(trimmed_str)
+                    else:
+                        final_mapping[old_idx] = t_pos - start_offset
+                
+                attr_index_maps[i] = final_mapping
+                new_attr_list.append(Attribute(attr.name, trimmed_str, attr.dtype))
+            else:
+                is_deleted = False
+                for seg_idx in delete_segments_id_list:
+                    if any(p.attr_index == i for p in self.segment_list[seg_idx]):
+                        is_deleted = True
+                        break
+                
+                val = attr.value
+                new_dtype = attr.dtype
+                if is_deleted:
+                    val = mask_str
+                    if mask_str is not None:
+                        new_dtype = "string"
+                new_attr_list.append(Attribute(attr.name, val, new_dtype))
 
-        attr_list = copy.deepcopy(self.attr_list)
-        # 削除対象部分を attr_index 毎にまとめる
-        del_value_seg_parts: Dict[int, List[SegmentPart]] = {}
-        for seg_idx in index_list:
-            for seg_part in self.segment_list[seg_idx]:
-                if seg_part.attr_index not in del_value_seg_parts:
-                    del_value_seg_parts[seg_part.attr_index] = []
-                del_value_seg_parts[seg_part.attr_index].append(seg_part)
-        # attr_index 毎にはじめから順番に削除する
-        for target_attr_idx, target_segparts in del_value_seg_parts.items():
-            # 文字列ではない場合、値をNoneにして終了
-            if target_segparts[0].start is None or target_segparts[0].end is None:
-                attr_list[target_attr_idx].value = None
-                continue
-            # 文字列の場合、はじめから順番に消していく
-            deleted_len = 0
-            val = attr_list[target_attr_idx].value
-            target_segparts = sorted(target_segparts, key=lambda x: x.start)
-            for target_segpart in target_segparts:
-                val = (
-                    val[: target_segpart.start - deleted_len]
-                    + mask_token_str
-                    + val[target_segpart.end - deleted_len :]
-                )
-                deleted_len += (
-                    target_segpart.end - target_segpart.start - len(mask_token_str)
-                )
-            # 連続空白は一つの空白に変更
-            val = re.sub("\s+", " ", val)
-            # 前後の空白は削除
-            val = val.strip(" ")
-            attr_list[target_attr_idx].value = val
-        return Entity(attr_list, self.tokenizer_func, self.aggregate_same_word)
+        keep_indices = [idx for idx in range(self.segment_size()) if idx not in delete_segments_id_list]
+        new_segment_list = []
+        
+        for idx in keep_indices:
+            cloned_parts = []
+            for p in self.segment_list[idx]:
+                if self.attr_list[p.attr_index].dtype == "string":
+                    mapping = attr_index_maps[p.attr_index]
+                    new_start = mapping[p.start]
+                    new_end = mapping[p.end]
+                    cloned_parts.append(SegmentPart(p.attr_index, new_start, new_end))
+                else:
+                    cloned_parts.append(SegmentPart(p.attr_index, p.start, p.end))
+            new_segment_list.append(cloned_parts)
 
+        return Entity(
+            attr_list=new_attr_list,
+            tokenizer_func=self.tokenizer_func,
+            aggregate_same_word=self.aggregate_same_word,
+            segment_list=new_segment_list
+        )
+
+    def make_entity_by_remain_segments(
+        self, 
+        remain_segments_id_list: List[int], 
+        mask_str: str = None, 
+        exclude_non_segment_chars: bool = True
+    ) -> "Entity":
+        """
+        指定されたセグメントのみを保持します。
+        exclude_non_segment_chars が True の場合、セグメント間の記号等は空白に変換されます。
+        """
+        all_indices = set(range(self.segment_size()))
+        remain_set = set(remain_segments_id_list)
+        delete_indices = list(all_indices - remain_set)
+        
+        return self.make_entity_by_deleting_segments(
+            delete_indices, 
+            mask_str=mask_str, 
+            exclude_non_segment_chars=exclude_non_segment_chars
+        )
+    
     def make_entity_by_adding_attribute(self, attr_list: List[Attribute]) -> Entity:
         """"""
         org_attr_list = copy.deepcopy(self.attr_list)
