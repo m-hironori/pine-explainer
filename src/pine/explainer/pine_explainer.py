@@ -267,7 +267,8 @@ def make_explanation(
     )
     # Explanation対象のペアがない場合は、空のLimeResultPairを返す
     if len(pair_segments) == 0:
-        return LimeResultPair([], None, None, None, None), entity_pair_merged
+        match_score = proba_fn(entity_pair)[0]
+        return LimeResultPair([], match_score, None, None, None), entity_pair_merged
 
     # STEP2: Create a list of attribution scores
     lime_result_pair = LimeResultPair(
