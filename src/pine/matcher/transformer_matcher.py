@@ -1,3 +1,4 @@
+from typing import Callable, Tuple, List
 import pathlib
 
 import torch
@@ -10,6 +11,7 @@ import pandas as pd
 import numpy as np
 
 from pine.matcher import _make_proba_fn
+from pine.entity import Entity, EntityPair
 
 
 def _get_best_model_checkpoint_dir(checkpoints_dir_path: pathlib.Path) -> pathlib.Path:
@@ -24,13 +26,13 @@ def _get_best_model_checkpoint_dir(checkpoints_dir_path: pathlib.Path) -> pathli
     return pathlib.Path((state.best_model_checkpoint))
 
 
-def load_transfofmer(model_name):
+def load_transfofmer(model_name)->Tuple[AutoModelForSequenceClassification, AutoTokenizer]:
     model = AutoModelForSequenceClassification.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     return model, tokenizer
 
 
-def load_transformer_pred_func(model_name):
+def load_transformer_pred_func(model_name)->Callable[[List[str], List[str]], torch.Tensor]:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, tokenizer = load_transfofmer(model_name)
     model.to(device)
@@ -52,7 +54,7 @@ def load_transformer_pred_func(model_name):
     return predict_func
 
 
-def load_transformer_pred_func_trained(dataset_name, model_root_dir):
+def load_transformer_pred_func_trained(dataset_name, model_root_dir)->Callable[[List[str], List[str]], torch.Tensor]:
     checkpoints_path = (
         pathlib.Path(model_root_dir) / "bert-mini" / dataset_name / "checkpoints"
     )
@@ -65,84 +67,106 @@ def load_transformer_pred_func_trained(dataset_name, model_root_dir):
     return load_transformer_pred_func(str(best_model_checkpoint_dir_path))
 
 
-def _format_records(records, attr_strings):
-    cols = list(records.columns)
-    return pd.DataFrame(
-        data={
-            "record": [
-                " ".join(
-                    f"COL {attr_strings(i, c)} VAL {'' if pd.isna(v) else v}"
-                    for c, v in zip(cols, r)
-                )
-                for i, r in enumerate(records.itertuples(index=False, name=None))
-            ]
-        },
-        index=records.index,
-        dtype="string",
+def entity_to_text(entity:Entity)->str:
+    return " ".join(
+        f"COL {attr.name} VAL {'' if pd.isna(attr.value) else attr.value}"
+        for attr in entity.attr_list
     )
+
+def make_transformer_matcher_func(
+    dataset_name: str, model_root_dir: str, batch_size: int = 512
+)->Callable[[List[EntityPair], bool], np.ndarray]:
+    pred_func = load_transformer_pred_func_trained(dataset_name, model_root_dir)
+
+    def score_fn(
+        entity_pairs: List[EntityPair], expand_axis: bool = True, is_proba: bool = False
+    ) -> np.ndarray:
+        """スコアを出力。エンティティペアごとに予測。
+        Args:
+            entity_pairs (list): 複数エンティティペア。
+            expand_axis (bool): Trueなら"[[score],[score]]"の形で返す
+            is_proba (bool): Trueなら0.0-1.0の確率で返す
+        Returns:
+            scores (np.ndarray): 各エンティティペアのスコア
+        """
+        all_probas = []
+        for i in range(0, len(entity_pairs), batch_size):
+            batch_pairs = entity_pairs[i : i + batch_size]
+            # make text data
+            texts_l, texts_r = [], []
+            for entity_pair in batch_pairs:
+                text_l = entity_to_text(entity_pair.entity_l)
+                text_r = entity_to_text(entity_pair.entity_r)
+                texts_l.append(text_l)
+                texts_r.append(text_r)
+            batch_preds = pred_func(texts_l, texts_r)["logits"].softmax(dim=1).to("cpu").numpy()[:, 1]
+            all_probas.append(batch_preds)
+        probas = np.concatenate(all_probas, axis=0)
+        
+        if is_proba:
+            scores = probas
+        else:
+            # スコアを規格化 0.0 - 1.0 を -1.0 - 1.0 にする
+            scores = 2 * probas - 1.0
+
+        # limeでは、1データに複数のラベルの結果がある場合が想定されているため、一軸増増やしたデータを作成
+        if expand_axis:
+            return scores[:, np.newaxis]
+        return scores
+
+    return score_fn
 
 
 def load_transformer_matcher_func(
-    dataset_name: str, model_root_dir: str, batch_size: int = None
-):
-    transformer_pred_func = load_transformer_pred_func_trained(
-        dataset_name, model_root_dir
-    )
+    dataset_name: str, model_root_dir: str, batch_size: int = 512
+)->Callable[[pd.DataFrame, pd.DataFrame, pd.DataFrame], pd.Series]:
+    """lemonモジュール用のproba関数(0から1 の確率)を作成する。
 
-    def predict_func(
+    Args:
+        dataset_name (str): データセット名
+        model_root_dir (str): モデルのルートディレクトリ
+        batch_size (int): バッチサイズ
+
+    Returns:
+        Callable[[pd.Dataframe, pd.Dataframe, pd.Dataframe], np.ndarray]: 本モジュール用のmatch score計算用関数(Dataframe 入力)
+
+    """
+    matcher_fnc_org = make_transformer_matcher_func(dataset_name, model_root_dir, batch_size)
+
+    def proba_fn(
         records_a: pd.DataFrame,
         records_b: pd.DataFrame,
         record_id_pairs: pd.DataFrame,
         batch_size: int = batch_size,
     ):
-        record_pairs = (
-            (
-                record_id_pairs.merge(
-                    records_a.add_prefix("a."), left_on="a.rid", right_index=True
-                ).merge(records_b.add_prefix("b."), left_on="b.rid", right_index=True)
+        """Predict(0-1の範囲の確率)を出力する関数を作成
+        Args:
+            records_a (pd.DataFrame): エンティティAのデータフレーム
+            records_b (pd.DataFrame): エンティティBのデータフレーム
+            record_id_pairs (pd.DataFrame): レコードIDペアのデータフレーム
+            batch_size (int): バッチサイズ
+        Returns:
+            scores (pd.Series): レコードIDペアのスコア
+        """
+        all_probas = []
+        for i in range(0, len(record_id_pairs), batch_size):
+            batch_pairs = record_id_pairs[i : i + batch_size]
+            entity_pairs = []
+            for _, row in batch_pairs.iterrows():
+                record_a = records_a.loc[[row["a.rid"]]]
+                record_b = records_b.loc[[row["b.rid"]]]
+                entity_pair = EntityPair(
+                    Entity.from_dataframe(record_a), Entity.from_dataframe(record_b)
+                )
+                entity_pairs.append(entity_pair)
+            batch_probas = matcher_fnc_org(
+                entity_pairs, expand_axis=False, is_proba=True
             )
-            .sort_index()
-            .drop(columns=["a.rid", "b.rid"])
-        )
-        attr_strings = [{}] * len(record_pairs)
-        record_pairs = pd.concat(
-            (
-                _format_records(
-                    record_pairs[
-                        [c for c in record_pairs.columns if c.startswith("a.")]
-                    ].rename(columns=lambda c: c[2:]),
-                    lambda i, attr: attr_strings[i].get(("a", attr), attr),
-                ).add_prefix("a."),
-                _format_records(
-                    record_pairs[
-                        [c for c in record_pairs.columns if c.startswith("b.")]
-                    ].rename(columns=lambda c: c[2:]),
-                    lambda i, attr: attr_strings[i].get(("b", attr), attr),
-                ).add_prefix("b."),
-            ),
-            axis=1,
-        )
+            all_probas.append(batch_probas)
 
-        outputs_batch_list = []
-        batch_size = record_pairs.shape[0] if batch_size is None else batch_size
-        for i in range(0, record_pairs.shape[0], batch_size):
-            outputs_batch = transformer_pred_func(
-                record_pairs.iloc[i : i + batch_size]["a.record"].tolist(),
-                record_pairs.iloc[i : i + batch_size]["b.record"].tolist(),
-            )["logits"].softmax(dim=1)
-            outputs_batch = outputs_batch.detach().to("cpu").numpy()[:, 1]
-            outputs_batch_list.append(outputs_batch)
+        probas = np.concatenate(all_probas, axis=0)
+        return pd.Series(probas, index=record_id_pairs.index)
 
-        return pd.Series(
-            np.concatenate(outputs_batch_list, axis=0), index=record_id_pairs.index
-        )
-
-    return predict_func
-
-
-def make_transformer_matcher_func(
-    dataset_name: str, model_root_dir: str, batch_size: int = 512
-):
-    predict_proba_func = load_transformer_matcher_func(dataset_name, model_root_dir, batch_size)
-    proba_fn = _make_proba_fn(predict_proba_func)
     return proba_fn
+
+
