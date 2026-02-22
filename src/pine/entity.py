@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, NamedTuple
 
 import pandas as pd
 
@@ -88,7 +88,7 @@ class Entity:
         self.attr_list: List[Attribute] = attr_list
         self.tokenizer_func = tokenizer_func
         self.aggregate_same_word = aggregate_same_word
-        
+
         if segment_list is not None:
             self.segment_list = segment_list
         else:
@@ -145,39 +145,38 @@ class Entity:
                 if seg_part.attr_index not in value_seg_parts:
                     value_seg_parts[seg_part.attr_index] = []
                 value_seg_parts[seg_part.attr_index].append(seg_part)
-        
+
         ret_attr_list = []
         sorted_attr_indices = sorted(value_seg_parts.keys())
 
         for target_attr_idx in sorted_attr_indices:
             target_segparts = value_seg_parts[target_attr_idx]
             attr_org = self.attr_list[target_attr_idx]
-            
+
             if attr_org.dtype != "string":
                 attr = Attribute(attr_org.name, attr_org.value, attr_org.dtype)
                 ret_attr_list.append(attr)
                 continue
-            
+
             val = ""
             target_segparts = sorted(target_segparts, key=lambda x: x.start)
             for target_segpart in target_segparts:
                 val += " " + attr_org.value[target_segpart.start : target_segpart.end]
-            
+
             val = re.sub(r"\s+", " ", val).strip()
             attr = Attribute(attr_org.name, val, attr_org.dtype)
             ret_attr_list.append(attr)
         return ret_attr_list
 
-
     def make_entity_by_deleting_segments(
-        self, 
-        delete_segments_id_list: List[int], 
-        mask_str: str = None, 
-        exclude_non_segment_chars: bool = False
+        self,
+        delete_segments_id_list: List[int],
+        mask_str: str = None,
+        exclude_non_segment_chars: bool = False,
     ) -> "Entity":
         """
         指定されたセグメントを削除（またはマスク）します。
-        
+
         Arguments:
             delete_segments_id_list: 削除/マスク対象のセグメントIDリスト
             mask_str: 削除部分を置き換える文字列
@@ -190,10 +189,10 @@ class Entity:
             if attr.dtype == "string":
                 original_val = attr.value
                 val_len = len(original_val)
-                
+
                 is_in_deleted_segment = [False] * val_len
                 is_in_any_segment = [False] * val_len
-                
+
                 for s_idx, seg in enumerate(self.segment_list):
                     for p in seg:
                         if p.attr_index == i:
@@ -201,25 +200,27 @@ class Entity:
                                 is_in_any_segment[char_idx] = True
                                 if s_idx in delete_segments_id_list:
                                     is_in_deleted_segment[char_idx] = True
-                
+
                 temp_chars = []
                 old_to_temp_idx = [0] * (val_len + 1)
                 current_temp_pos = 0
                 prev_was_space = False
                 in_deleted_span = False
-                
+
                 for char_idx in range(val_len):
                     old_to_temp_idx[char_idx] = current_temp_pos
-                    
+
                     is_deleted = is_in_deleted_segment[char_idx]
                     is_noise = not is_in_any_segment[char_idx]
-                    
+
                     if is_deleted:
                         if mask_str is not None and not in_deleted_span:
                             for m_char in mask_str:
                                 temp_chars.append(m_char)
                                 current_temp_pos += 1
-                            prev_was_space = mask_str[-1].isspace() if mask_str else prev_was_space
+                            prev_was_space = (
+                                mask_str[-1].isspace() if mask_str else prev_was_space
+                            )
                             in_deleted_span = True
                         # mask_strがNoneの場合は削除される
                     elif exclude_non_segment_chars and is_noise:
@@ -234,7 +235,7 @@ class Entity:
                         in_deleted_span = False
                         char = original_val[char_idx]
                         is_space = char.isspace()
-                        
+
                         if is_space:
                             if not prev_was_space:
                                 temp_chars.append(char)
@@ -244,20 +245,20 @@ class Entity:
                             temp_chars.append(char)
                             current_temp_pos += 1
                             prev_was_space = False
-                
+
                 old_to_temp_idx[val_len] = current_temp_pos
-                
+
                 temp_str = "".join(temp_chars)
                 trimmed_str = temp_str.strip()
-                
+
                 if not trimmed_str:
                     attr_index_maps[i] = [0] * (val_len + 1)
                     new_attr_list.append(Attribute(attr.name, "", attr.dtype))
                     continue
-                
+
                 start_offset = len(temp_str) - len(temp_str.lstrip())
                 end_limit = start_offset + len(trimmed_str)
-                
+
                 final_mapping = [0] * (val_len + 1)
                 for old_idx in range(val_len + 1):
                     t_pos = old_to_temp_idx[old_idx]
@@ -267,7 +268,7 @@ class Entity:
                         final_mapping[old_idx] = len(trimmed_str)
                     else:
                         final_mapping[old_idx] = t_pos - start_offset
-                
+
                 attr_index_maps[i] = final_mapping
                 new_attr_list.append(Attribute(attr.name, trimmed_str, attr.dtype))
             else:
@@ -276,7 +277,7 @@ class Entity:
                     if any(p.attr_index == i for p in self.segment_list[seg_idx]):
                         is_deleted = True
                         break
-                
+
                 val = attr.value
                 new_dtype = attr.dtype
                 if is_deleted:
@@ -285,9 +286,13 @@ class Entity:
                         new_dtype = "string"
                 new_attr_list.append(Attribute(attr.name, val, new_dtype))
 
-        keep_indices = [idx for idx in range(self.segment_size()) if idx not in delete_segments_id_list]
+        keep_indices = [
+            idx
+            for idx in range(self.segment_size())
+            if idx not in delete_segments_id_list
+        ]
         new_segment_list = []
-        
+
         for idx in keep_indices:
             cloned_parts = []
             for p in self.segment_list[idx]:
@@ -304,14 +309,14 @@ class Entity:
             attr_list=new_attr_list,
             tokenizer_func=self.tokenizer_func,
             aggregate_same_word=self.aggregate_same_word,
-            segment_list=new_segment_list
+            segment_list=new_segment_list,
         )
 
     def make_entity_by_remain_segments(
-        self, 
-        remain_segments_id_list: List[int], 
-        mask_str: str = None, 
-        exclude_non_segment_chars: bool = True
+        self,
+        remain_segments_id_list: List[int],
+        mask_str: str = None,
+        exclude_non_segment_chars: bool = True,
     ) -> "Entity":
         """
         指定されたセグメントのみを保持します。
@@ -320,13 +325,13 @@ class Entity:
         all_indices = set(range(self.segment_size()))
         remain_set = set(remain_segments_id_list)
         delete_indices = list(all_indices - remain_set)
-        
+
         return self.make_entity_by_deleting_segments(
-            delete_indices, 
-            mask_str=mask_str, 
-            exclude_non_segment_chars=exclude_non_segment_chars
+            delete_indices,
+            mask_str=mask_str,
+            exclude_non_segment_chars=exclude_non_segment_chars,
         )
-    
+
     def make_entity_by_adding_attribute(self, attr_list: List[Attribute]) -> Entity:
         """"""
         org_attr_list = copy.deepcopy(self.attr_list)
@@ -403,10 +408,9 @@ class Entity:
         return Entity(attr_list, tokenizer_func, aggregate_same_word)
 
 
-@dataclass
-class MergedSegment:
-    segment_list_in_l: List[int] = field(default_factory=lambda: [])
-    segment_list_in_r: List[int] = field(default_factory=lambda: [])
+class MergedSegment(NamedTuple):
+    segment_list_in_l: List[int]
+    segment_list_in_r: List[int]
 
 
 class EntityPair:
@@ -532,7 +536,7 @@ class EntityPair:
                 index_map_r[org_idx] = org_idx - del_num
         merged_segment_list_new = []
         for merged_segment in self.merged_segment_list:
-            merged_segment_new = MergedSegment()
+            merged_segment_new = MergedSegment([], [])
             for l_idx in merged_segment.segment_list_in_l:
                 if index_map_l[l_idx] is not None:
                     merged_segment_new.segment_list_in_l.append(index_map_l[l_idx])
