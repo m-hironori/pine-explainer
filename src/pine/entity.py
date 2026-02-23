@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, NamedTuple
 
 import pandas as pd
@@ -347,7 +347,7 @@ class Entity:
                         org_attr.value = org_attr.value.strip(" ")
                     else:
                         org_attr.value = attr.value
-            if is_find == False:
+            if is_find is False:
                 ValueError(
                     "Can not add the attribute "
                     f"name={attr.name} val={attr.value} dtype={attr.dtype}"
