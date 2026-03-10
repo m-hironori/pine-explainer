@@ -408,9 +408,50 @@ class Entity:
         return Entity(attr_list, tokenizer_func, aggregate_same_word)
 
 
-class MergedSegment(NamedTuple):
-    segment_list_in_l: List[int]
-    segment_list_in_r: List[int]
+class MergedSegment:
+    __slots__ = ["segment_list_in_l", "segment_list_in_r"]
+
+    def __init__(self, segment_list_in_l: List[int], segment_list_in_r: List[int]):
+        self.segment_list_in_l = segment_list_in_l
+        self.segment_list_in_r = segment_list_in_r
+
+    def __setstate__(self, state):
+        """
+        pickle.load 時に厳格なバリデーションを行う。
+        未知の形式や欠損がある場合は例外を投げる。
+        """
+        if isinstance(state, dict):
+            # 辞書形式: キーが欠けている場合は KeyError が発生する
+            try:
+                self.segment_list_in_l = state["segment_list_in_l"]
+                self.segment_list_in_r = state["segment_list_in_r"]
+            except KeyError as e:
+                raise KeyError(f"Missing required key in pickle data: {e}")
+
+        elif isinstance(state, (tuple, list)):
+            # シーケンス形式: 要素数が2でない場合は ValueError を投げる
+            if len(state) != 2:
+                raise ValueError(f"Expected 2 elements in tuple, but got {len(state)}")
+            self.segment_list_in_l = list(state[0])
+            self.segment_list_in_r = list(state[1])
+
+        else:
+            # 想定外の型（int, string など）が来た場合
+            raise TypeError(f"Unsupported pickle state type: {type(state)}")
+
+    def __getstate__(self):
+        """保存時は常にこの形式に統一される"""
+        return {
+            "segment_list_in_l": self.segment_list_in_l,
+            "segment_list_in_r": self.segment_list_in_r,
+        }
+
+    def __getitem__(self, item):
+        if item == 0:
+            return self.segment_list_in_l
+        if item == 1:
+            return self.segment_list_in_r
+        raise IndexError("MergedSegment index out of range")
 
 
 class EntityPair:
