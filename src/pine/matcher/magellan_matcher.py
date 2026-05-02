@@ -1,3 +1,5 @@
+import contextlib
+import logging
 import sys
 import pathlib
 import typing
@@ -6,6 +8,26 @@ import pickle
 import concurrent.futures
 import pandas as pd
 import numpy as np
+
+
+@contextlib.contextmanager
+def _suppress_cloudpickle_module_scan_warnings():
+    # py_entitymatching generates feature functions via exec() with __module__=None.
+    # cloudpickle (used by LIME) scans all sys.modules to locate these functions,
+    # hitting transformers 5.x's _fast image-processor aliases and triggering
+    # spurious "alias will be removed" warnings. Filter only those messages.
+    class _Filter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            return not ("image_processing" in msg and "alias will be removed" in msg)
+
+    logger = logging.getLogger("transformers")
+    f = _Filter()
+    logger.addFilter(f)
+    try:
+        yield
+    finally:
+        logger.removeFilter(f)
 
 # Can not save and load the model created MalleganMatcher.
 # So, patching with these codes for saving and loading model file
@@ -77,7 +99,12 @@ def load_magellan_model_predict_func(
 
 def make_magellan_matcher_func(dataset_name: str, model_root_dir: str):
     predict_proba_func = load_magellan_model_predict_func(dataset_name, model_root_dir)
-    proba_fn = _make_proba_fn(predict_proba_func)
+    base_proba_fn = _make_proba_fn(predict_proba_func)
+
+    def proba_fn(entity_pairs, expand_axis=True):
+        with _suppress_cloudpickle_module_scan_warnings():
+            return base_proba_fn(entity_pairs, expand_axis)
+
     return proba_fn
 
 
